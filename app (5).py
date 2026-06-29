@@ -105,16 +105,49 @@ def atividades_do_dia(dia: date):
 
 
 # ---------------- ESTILO ----------------
-st.markdown("""
+FONTE = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif"
+
+st.markdown(f"""
 <style>
-.cal-header {background:#1c1c1c; color:white; padding:14px 18px; border-radius:8px 8px 0 0;
-             display:flex; justify-content:space-between; align-items:center;}
-.cal-title {font-size:26px; font-weight:800; letter-spacing:1px;}
-.dia-semana-label {text-align:center; font-weight:800; padding:6px; border-radius:6px; margin-bottom:4px;}
-.atividade-pill {border-radius:5px; padding:3px 6px; margin-bottom:3px; font-size:12px;
-                  color:white; line-height:1.25; word-wrap:break-word;}
-.day-cell {border:1px solid #ddd; min-height:130px; padding:4px; border-radius:4px;}
-.day-num {font-weight:700; font-size:14px;}
+* {{ font-family: {FONTE} !important; }}
+
+.cal-header {{background:#1c1c1c; color:white; padding:14px 18px; border-radius:8px 8px 0 0;
+             display:flex; justify-content:space-between; align-items:center;
+             font-family:{FONTE};}}
+.cal-title {{font-size:1.6rem; font-weight:800; letter-spacing:1px; margin:0;}}
+
+.dia-semana-label {{text-align:center; font-weight:800; padding:6px; border-radius:6px;
+                    margin-bottom:4px; font-size:0.8rem; font-family:{FONTE};}}
+
+.day-card {{
+    border:2px solid #ddd; border-radius:6px; padding:6px;
+    height:170px; overflow-y:auto; box-sizing:border-box;
+    font-family:{FONTE};
+}}
+.day-num {{font-weight:700; font-size:0.95rem; margin-bottom:4px; font-family:{FONTE};}}
+
+.week-card {{
+    border:1px solid #ccc; border-radius:0 0 6px 6px;
+    padding:6px; box-sizing:border-box;
+    height:420px; overflow-y:auto;
+    font-family:{FONTE};
+}}
+.week-card-hoje {{ border:3px solid #F5A623; }}
+
+.week-header {{
+    text-align:center; padding:6px; border-radius:6px 6px 0 0;
+    font-weight:800; color:white; font-family:{FONTE};
+}}
+.week-header .data-sub {{ font-size:0.75rem; font-weight:600; }}
+
+.atividade-pill {{
+    border-radius:5px; padding:4px 7px; margin-bottom:4px;
+    font-size:0.72rem; line-height:1.3; color:white;
+    word-wrap:break-word; overflow-wrap:break-word;
+    font-family:{FONTE};
+}}
+.sem-atividade {{ font-size:0.72rem; color:#999; font-style:italic; font-family:{FONTE};}}
+.mais-info {{ font-size:0.68rem; color:#888; font-family:{FONTE}; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -177,15 +210,21 @@ def render_mes():
                 borda = "#F5A623" if dia == hoje else "#ddd"
                 opacidade = "1" if no_mes else "0.35"
 
-                html = f'<div class="day-cell" style="border-color:{borda}; opacity:{opacidade};">'
-                html += f'<div class="day-num">{dia.day}</div>'
-                for a in ativs[:4]:
-                    texto = a["atividade"][:38] + ("…" if len(a["atividade"]) > 38 else "")
-                    html += f'<div class="atividade-pill" style="background:{a["cor"]};">{texto}</div>'
-                if len(ativs) > 4:
-                    html += f'<div style="font-size:11px;color:#888;">+{len(ativs)-4} mais</div>'
-                html += "</div>"
-                st.markdown(html, unsafe_allow_html=True)
+                pills_html = ""
+                for a in ativs[:MAX_ATIVIDADES_DIA]:
+                    texto = a["atividade"][:60] + ("…" if len(a["atividade"]) > 60 else "")
+                    pills_html += f'<div class="atividade-pill" style="background:{a["cor"]};">{texto}</div>'
+                if len(ativs) > MAX_ATIVIDADES_DIA:
+                    pills_html += f'<div class="mais-info">+{len(ativs)-MAX_ATIVIDADES_DIA} mais</div>'
+
+                # Bloco único de HTML - nada fragmentado, nada solto fora da div
+                card_html = (
+                    f'<div class="day-card" style="border-color:{borda}; opacity:{opacidade};">'
+                    f'<div class="day-num">{dia.day}</div>'
+                    f'{pills_html}'
+                    f'</div>'
+                )
+                st.markdown(card_html, unsafe_allow_html=True)
 
                 label_btn = "Abrir ›" if ativs else "·"
                 if st.button(label_btn, key=f"btn_{dia.isoformat()}", use_container_width=True):
@@ -236,28 +275,26 @@ def render_semana():
 
     for i, dia in enumerate(dias):
         with cols[i]:
-            destaque = "border:3px solid #F5A623;" if dia == hoje else "border:1px solid #ccc;"
-            st.markdown(
-                f'<div style="background:{cores_semana[i]};color:white;text-align:center;'
-                f'padding:6px;border-radius:6px 6px 0 0;font-weight:800;">'
-                f'{DIAS_SEMANA[i]}<br><span style="font-size:13px;">{dia.strftime("%d/%m")}</span></div>',
-                unsafe_allow_html=True)
-
-            st.markdown(
-                f'<div style="{destaque} min-height:340px; padding:6px; border-radius:0 0 6px 6px;">',
-                unsafe_allow_html=True)
+            classe_extra = " week-card-hoje" if dia == hoje else ""
 
             ativs = atividades_do_dia(dia)
+            pills_html = ""
             if not ativs:
-                st.caption("Sem atividades")
-            for a in ativs[:MAX_ATIVIDADES_DIA]:
-                st.markdown(
-                    f'<div class="atividade-pill" style="background:{a["cor"]};font-size:11px;">'
-                    f'{a["atividade"]}</div>', unsafe_allow_html=True)
-            if len(ativs) > MAX_ATIVIDADES_DIA:
-                st.caption(f"+{len(ativs) - MAX_ATIVIDADES_DIA} atividades não exibidas")
+                pills_html = '<div class="sem-atividade">Sem atividades</div>'
+            else:
+                for a in ativs[:MAX_ATIVIDADES_DIA]:
+                    pills_html += f'<div class="atividade-pill" style="background:{a["cor"]};">{a["atividade"]}</div>'
+                if len(ativs) > MAX_ATIVIDADES_DIA:
+                    pills_html += f'<div class="mais-info">+{len(ativs)-MAX_ATIVIDADES_DIA} atividades não exibidas</div>'
 
-            st.markdown('</div>', unsafe_allow_html=True)
+            # Header + corpo do card num único bloco HTML (sem widgets nativos misturados)
+            bloco_html = (
+                f'<div class="week-header" style="background:{cores_semana[i]};">'
+                f'{DIAS_SEMANA[i]}<br><span class="data-sub">{dia.strftime("%d/%m")}</span>'
+                f'</div>'
+                f'<div class="week-card{classe_extra}">{pills_html}</div>'
+            )
+            st.markdown(bloco_html, unsafe_allow_html=True)
 
     st.markdown("---")
     st.subheader("📝 Observações da semana")
