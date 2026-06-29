@@ -1,10 +1,12 @@
-import streamlit as st
+import streamlit as st  # CORREÇÃO Bug 7: set_page_config deve ser chamado antes de qualquer outro st.*
+st.set_page_config(page_title="Painel Digital Planner", layout="wide")
+
 import pandas as pd
 import calendar
 from datetime import date, datetime, timedelta
 import requests
 from io import StringIO
-import chardet  # Adicione esta importação
+# CORREÇÃO Bug 3: removida dependência de chardet — planilhas Google CSV são sempre UTF-8
 
 # ---------------- CONFIG ----------------
 SHEET_ID = "1kte6Ys9vgzw7a0Z1PDXkxf6VOX9KHWlRCXp7P-7RSi4"
@@ -35,6 +37,7 @@ CATEGORIAS = [
 ]
 COR_PADRAO = "#95A5A6"
 
+
 def categorizar(texto: str):
     if not isinstance(texto, str) or not texto.strip():
         return "Outros", COR_PADRAO
@@ -44,66 +47,55 @@ def categorizar(texto: str):
             return nome, cor
     return "Outros", COR_PADRAO
 
+
 @st.cache_data(ttl=600)
 def carregar_dados():
     resp = requests.get(CSV_URL, timeout=15)
     resp.raise_for_status()
-    
-    # Detecta a codificação automaticamente
-    encoding = chardet.detect(resp.content)['encoding']
-    if encoding is None:
-        encoding = 'utf-8'
-    
-    # Decodifica com a codificação detectada e depois força UTF-8
-    decoded_text = resp.content.decode(encoding, errors='ignore')
-    
-    # Corrige caracteres comuns de codificação incorreta
-    # Mapeamento de caracteres comuns que aparecem corrompidos
-    replacements = {
-        'Ã§': 'ç', 'Ã£': 'ã', 'Ã¡': 'á', 'Ã©': 'é', 'Ãº': 'ú', 
-        'Ãª': 'ê', 'Ãµ': 'õ', 'Ãµ': 'õ', 'Ã´': 'ô', 'Ã': 'À',
-        'Âª': 'ª', 'Â°': '°', 'Â®': '®', 'Â´': '´', 'Â·': '·',
-        'â€œ': '"', 'â€\x9d': '"', 'â€˜': "'", 'â€™': "'",
-        'Ã ' : 'á', 'Ã¡' : 'á', 'Ã¢' : 'â', 'Ã£' : 'ã', 'Ã¤' : 'ä',
-        'Ã¥' : 'å', 'Ã¦' : 'æ', 'Ã§' : 'ç', 'Ã¨' : 'è', 'Ã©' : 'é',
-        'Ãª' : 'ê', 'Ã«' : 'ë', 'Ã¬' : 'ì', 'Ã­' : 'í', 'Ã®' : 'î',
-        'Ã¯' : 'ï', 'Ã°' : 'ð', 'Ã±' : 'ñ', 'Ã²' : 'ò', 'Ã³' : 'ó',
-        'Ã´' : 'ô', 'Ãµ' : 'õ', 'Ã¶' : 'ö', 'Ã·' : '÷', 'Ã¸' : 'ø',
-        'Ã¹' : 'ù', 'Ãº' : 'ú', 'Ã»' : 'û', 'Ã¼' : 'ü', 'Ã½' : 'ý',
-        'Ã¾' : 'þ', 'Ã¿' : 'ÿ'
-    }
-    
-    # Aplica as correções
-    for wrong, correct in replacements.items():
-        decoded_text = decoded_text.replace(wrong, correct)
-    
-    # Usa StringIO para criar o DataFrame
+
+    # CORREÇÃO Bug 1, 2, 3, 4:
+    # Google Sheets sempre exporta CSV em UTF-8. Decodificação direta é suficiente e segura.
+    # Removido chardet e o dicionário de substituições manual (frágil, com chaves duplicadas).
+    decoded_text = resp.content.decode("utf-8", errors="replace")
+
     df_raw = pd.read_csv(StringIO(decoded_text), header=None)
-    
+
+    # CORREÇÃO Bug 5: validação mínima de colunas antes de acessar índice 4
+    if df_raw.shape[1] < 5:
+        raise ValueError(
+            f"Planilha retornou apenas {df_raw.shape[1]} coluna(s). "
+            "Verifique se o GID e o layout da aba estão corretos."
+        )
+
     # Linha 7 da planilha = índice 6 (0-based)
     df = df_raw.iloc[6:, [0, 4]].copy()
     df.columns = ["data_raw", "atividade"]
     df = df.dropna(subset=["data_raw"])
-    
+
     df["data"] = pd.to_datetime(df["data_raw"], format="%d/%m/%Y", errors="coerce")
     df = df.dropna(subset=["data"])
     df["data"] = df["data"].dt.date
     df["atividade"] = df["atividade"].fillna("").astype(str).str.strip()
     df = df[df["atividade"] != ""]
-    
-    # Aplica a categorização
-    cat_cor = df["atividade"].apply(categorizar)
-    df["categoria"] = cat_cor.apply(lambda x: x[0])
-    df["cor"] = cat_cor.apply(lambda x: x[1])
-    
+
+    # CORREÇÃO Bug 6: evita percorrer a Series três vezes com apply duplo.
+    # Aplica categorizar uma única vez e desempacota com pd.DataFrame.
+    cat_df = pd.DataFrame(df["atividade"].apply(categorizar).tolist(),
+                          columns=["categoria", "cor"],
+                          index=df.index)
+    df = pd.concat([df, cat_df], axis=1)
+
     return df.sort_values("data").reset_index(drop=True)
 
+
 # ---------------- ESTADO ----------------
-st.set_page_config(page_title="Painel Digital Planner", layout="wide")
+# (set_page_config já foi chamado no topo do arquivo — Bug 7 corrigido)
 
 hoje = date.today()
-if "ano" not in st.session_state: st.session_state.ano = hoje.year
-if "mes" not in st.session_state: st.session_state.mes = hoje.month
+if "ano" not in st.session_state:
+    st.session_state.ano = hoje.year
+if "mes" not in st.session_state:
+    st.session_state.mes = hoje.month
 
 try:
     df = carregar_dados()
@@ -111,21 +103,25 @@ except Exception as e:
     st.error(f"Erro ao carregar a planilha: {e}")
     st.stop()
 
-def atividades_do_dia(dia: date):
-    return df[df["data"] == dia].to_dict("records")
+# CORREÇÃO Bug 8: índice por data construído uma única vez, evitando O(35n) lookups.
+_idx_por_data: dict = {}
+for _, row in df.iterrows():
+    _idx_por_data.setdefault(row["data"], []).append(row.to_dict())
+
+
+def atividades_do_dia(dia: date) -> list:
+    return _idx_por_data.get(dia, [])
+
 
 # ---------------- ESTILO MODERNO ----------------
 st.markdown("""
 <style>
-/* Importação de fontes modernas */
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap');
 
-/* Reset e estilos base */
 * {
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
 }
 
-/* Container principal */
 .planner-container {
     background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
     padding: 30px;
@@ -134,7 +130,6 @@ st.markdown("""
     backdrop-filter: blur(10px);
 }
 
-/* Header do planner */
 .planner-header {
     background: white;
     border: none;
@@ -165,7 +160,6 @@ st.markdown("""
     margin: 0;
 }
 
-/* Labels dos dias da semana */
 .dia-semana-label {
     text-align: center;
     font-weight: 700;
@@ -179,7 +173,6 @@ st.markdown("""
     letter-spacing: 1px;
 }
 
-/* Cards dos dias */
 .day-card {
     border: none;
     background: white;
@@ -215,7 +208,6 @@ st.markdown("""
     border-radius: 20px;
 }
 
-/* Itens de tarefa */
 .task-item {
     display: flex;
     align-items: flex-start;
@@ -253,7 +245,6 @@ st.markdown("""
     line-height: 1.4;
 }
 
-/* Scrollbar personalizada */
 ::-webkit-scrollbar {
     width: 6px;
 }
@@ -272,7 +263,6 @@ st.markdown("""
     background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
 }
 
-/* Botões de navegação */
 .stButton button {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
@@ -347,13 +337,25 @@ for semana in semanas:
             html_tasks = ""
             for a in ativs[:MAX_ATIVIDADES_DIA]:
                 texto = a["atividade"]
-                html_tasks += f'<div class="task-item"><div class="task-box"></div><div class="task-text" style="color:{a["cor"]}; font-weight:600;">{texto}</div></div>'
-            
-            if len(ativs) > MAX_ATIVIDADES_DIA:
-                html_tasks += f'<div style="font-size:0.7rem; color:#6c757d; text-align:center; margin-top:8px; font-weight:600;">+{len(ativs)-MAX_ATIVIDADES_DIA} itens</div>'
+                html_tasks += (
+                    f'<div class="task-item">'
+                    f'<div class="task-box"></div>'
+                    f'<div class="task-text" style="color:{a["cor"]}; font-weight:600;">{texto}</div>'
+                    f'</div>'
+                )
 
-            card_html = f'<div class="day-card" style="opacity:{opacidade}; background:{bg_color}; {borda_topo}"><div class="day-card-header"><span class="day-num">{dia.day}</span></div>{html_tasks}</div>'
-            
+            if len(ativs) > MAX_ATIVIDADES_DIA:
+                html_tasks += (
+                    f'<div style="font-size:0.7rem; color:#6c757d; text-align:center; '
+                    f'margin-top:8px; font-weight:600;">+{len(ativs) - MAX_ATIVIDADES_DIA} itens</div>'
+                )
+
+            card_html = (
+                f'<div class="day-card" style="opacity:{opacidade}; background:{bg_color}; {borda_topo}">'
+                f'<div class="day-card-header"><span class="day-num">{dia.day}</span></div>'
+                f'{html_tasks}</div>'
+            )
+
             st.markdown(card_html, unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
