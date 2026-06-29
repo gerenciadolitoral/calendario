@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import calendar
-from datetime import date
+from datetime import date, datetime, timedelta
 import requests
 from io import StringIO
 
@@ -47,8 +47,11 @@ def categorizar(texto: str):
 def carregar_dados():
     resp = requests.get(CSV_URL, timeout=15)
     resp.raise_for_status()
+    
+    # Usando StringIO com resp.text (mesma abordagem do código que você compartilhou)
     df_raw = pd.read_csv(StringIO(resp.text), header=None)
 
+    # Linha 7 da planilha = índice 6 (0-based)
     df = df_raw.iloc[6:, [0, 4]].copy()
     df.columns = ["data_raw", "atividade"]
     df = df.dropna(subset=["data_raw"])
@@ -81,7 +84,7 @@ except Exception as e:
 def atividades_do_dia(dia: date):
     return df[df["data"] == dia].to_dict("records")
 
-# ---------------- ESTILO MODERNO CORRIGIDO ----------------
+# ---------------- ESTILO MODERNO ----------------
 st.markdown("""
 <style>
 /* Importação de fontes modernas */
