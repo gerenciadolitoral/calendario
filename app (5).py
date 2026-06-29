@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import calendar
-from datetime import date, datetime, timedelta
+from datetime import date
 import requests
 from io import StringIO
 
@@ -15,7 +15,6 @@ MESES_PT = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
             "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 MAX_ATIVIDADES_DIA = 8
 
-# Cores pastéis inspiradas na imagem para os dias da semana
 CORES_SEMANA = ["#5AB0A2", "#EB8C87", "#A6CA76", "#EB8DB5", "#F4BA5E", "#A0AAB2", "#848E96"]
 
 CATEGORIAS = [
@@ -97,7 +96,6 @@ st.markdown(f"""
     box-shadow: 0px 4px 15px rgba(0,0,0,0.02);
 }}
 
-/* Header com fonte Serifada estilo clássico */
 .planner-header {{
     border: 2px solid #3B3C43;
     border-radius: 8px;
@@ -121,7 +119,6 @@ st.markdown(f"""
     font-family: 'Georgia', serif !important; font-style: italic;
 }}
 
-/* Grid do Calendário */
 .day-card {{
     border: 1px solid #EBEBEB; background: #FFFFFF;
     height: 180px; overflow-y: auto; padding: 8px;
@@ -135,7 +132,6 @@ st.markdown(f"""
     font-weight: 700; font-size: 0.9rem; color: #555;
 }}
 
-/* Estilo Checklist */
 .task-item {{
     display: flex; align-items: flex-start;
     font-size: 0.75rem; margin-bottom: 6px; color: #444;
@@ -149,6 +145,10 @@ st.markdown(f"""
 .task-text {{
     word-break: break-word;
 }}
+
+::-webkit-scrollbar {{ width: 4px; }}
+::-webkit-scrollbar-track {{ background: transparent; }}
+::-webkit-scrollbar-thumb {{ background: #d1d5db; border-radius: 4px; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -160,7 +160,6 @@ ano, mes = st.session_state.ano, st.session_state.mes
 
 st.markdown('<div class="planner-container">', unsafe_allow_html=True)
 
-# Controles e Cabeçalho
 col_nav1, col_nav2, col_nav3 = st.columns([1, 4, 1])
 with col_nav1:
     if st.button("◀ Anterior"):
@@ -181,50 +180,13 @@ with col_nav3:
         else: st.session_state.mes += 1
         st.rerun()
 
-# Dias da Semana
 cols = st.columns(7)
 for i, dia_nome in enumerate(DIAS_SEMANA):
     cols[i].markdown(
         f'<div class="dia-semana-label" style="color:{CORES_SEMANA[i]};">{dia_nome}</div>',
         unsafe_allow_html=True)
 
-# Grid Mensal
 cal = calendar.Calendar(firstweekday=0)
 semanas = cal.monthdatescalendar(ano, mes)
 
 for semana in semanas:
-    cols = st.columns(7)
-    for i, dia in enumerate(semana):
-        with cols[i]:
-            no_mes = dia.month == mes
-            ativs = atividades_do_dia(dia)
-            opacidade = "1" if no_mes else "0.4"
-            bg_color = "#FAFAFA" if not no_mes else "#FFFFFF"
-
-            # Borda do topo com a cor do dia da semana (detalhe do planner)
-            borda_topo = f"border-top: 4px solid {CORES_SEMANA[i]};" if no_mes else "border-top: 4px solid #EBEBEB;"
-
-            html_tasks = ""
-            for a in ativs[:MAX_ATIVIDADES_DIA]:
-                texto = a["atividade"]
-                # A cor da categoria agora pinta apenas o texto ou um leve background para ficar sutil
-                html_tasks += f'''
-                <div class="task-item">
-                    <div class="task-box"></div>
-                    <div class="task-text" style="color: {a["cor"]}; font-weight: 600;">{texto}</div>
-                </div>'''
-            
-            if len(ativs) > MAX_ATIVIDADES_DIA:
-                html_tasks += f'<div style="font-size: 0.65rem; color: #999; text-align: center;">+{len(ativs)-MAX_ATIVIDADES_DIA} itens</div>'
-
-            card_html = f'''
-            <div class="day-card" style="opacity:{opacidade}; background:{bg_color}; {borda_topo}">
-                <div class="day-card-header">
-                    <span class="day-num">{dia.day}</span>
-                </div>
-                {html_tasks}
-            </div>
-            '''
-            st.markdown(card_html, unsafe_allow_html=True)
-
-st.markdown('</div>', unsafe_allow_html=True)
