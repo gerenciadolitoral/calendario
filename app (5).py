@@ -54,6 +54,9 @@ def categorizar(texto: str):
 def carregar_dados():
     resp = requests.get(CSV_URL, timeout=15)
     resp.raise_for_status()
+    resp.encoding = "utf-8"  # Google Sheets nem sempre declara charset no header;
+                              # sem isso requests pode decodificar como latin-1 e
+                              # corromper acentos (ex: "AtualizaÃ§Ã£o")
     df_raw = pd.read_csv(StringIO(resp.text), header=None)
 
     # Linha 7 da planilha = índice 6 (0-based)
