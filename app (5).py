@@ -190,3 +190,27 @@ cal = calendar.Calendar(firstweekday=0)
 semanas = cal.monthdatescalendar(ano, mes)
 
 for semana in semanas:
+    cols = st.columns(7)
+    for i, dia in enumerate(semana):
+        with cols[i]:
+            no_mes = dia.month == mes
+            ativs = atividades_do_dia(dia)
+            opacidade = "1" if no_mes else "0.4"
+            bg_color = "#FAFAFA" if not no_mes else "#FFFFFF"
+            borda_topo = f"border-top: 4px solid {CORES_SEMANA[i]};" if no_mes else "border-top: 4px solid #EBEBEB;"
+
+            html_tasks = ""
+            for a in ativs[:MAX_ATIVIDADES_DIA]:
+                texto = a["atividade"]
+                # A injeção do bloco HTML está achatada para não disparar bloco de código no Markdown
+                html_tasks += f'<div class="task-item"><div class="task-box"></div><div class="task-text" style="color:{a["cor"]}; font-weight:600;">{texto}</div></div>'
+            
+            if len(ativs) > MAX_ATIVIDADES_DIA:
+                html_tasks += f'<div style="font-size:0.65rem; color:#999; text-align:center; margin-top:4px;">+{len(ativs)-MAX_ATIVIDADES_DIA} itens</div>'
+
+            # Construção consolidada e cimentada do card principal também sem formatação recuada
+            card_html = f'<div class="day-card" style="opacity:{opacidade}; background:{bg_color}; {borda_topo}"><div class="day-card-header"><span class="day-num">{dia.day}</span></div>{html_tasks}</div>'
+            
+            st.markdown(card_html, unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
