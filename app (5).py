@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import calendar
-from datetime import date, datetime, timedelta
+from datetime import date
 import requests
 from io import StringIO
 
@@ -10,7 +10,7 @@ SHEET_ID = "1kte6Ys9vgzw7a0Z1PDXkxf6VOX9KHWlRCXp7P-7RSi4"
 GID = "507430155"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid={GID}"
 
-DIAS_SEMANA = ["Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado", "Domingo"]
+DIAS_SEMANA = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 MESES_PT = ["", "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
             "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"]
 MAX_ATIVIDADES_DIA = 8
@@ -47,11 +47,8 @@ def categorizar(texto: str):
 def carregar_dados():
     resp = requests.get(CSV_URL, timeout=15)
     resp.raise_for_status()
-    
-    # Usando StringIO com resp.text (mesma abordagem do código que você compartilhou)
     df_raw = pd.read_csv(StringIO(resp.text), header=None)
 
-    # Linha 7 da planilha = índice 6 (0-based)
     df = df_raw.iloc[6:, [0, 4]].copy()
     df.columns = ["data_raw", "atividade"]
     df = df.dropna(subset=["data_raw"])
@@ -84,182 +81,74 @@ except Exception as e:
 def atividades_do_dia(dia: date):
     return df[df["data"] == dia].to_dict("records")
 
-# ---------------- ESTILO MODERNO ----------------
-st.markdown("""
+# ---------------- ESTILO (INSPIRADO NO PLANNER) ----------------
+FONTE = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif"
+
+st.markdown(f"""
 <style>
-/* Importação de fontes modernas */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap');
+* {{ font-family: {FONTE} !important; }}
 
-/* Reset e estilos base */
-* {
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-}
+.planner-container {{
+    background-color: #FDFDFD;
+    padding: 20px;
+    border-radius: 12px;
+    border: 2px solid #EBEBEB;
+    box-shadow: 0px 4px 15px rgba(0,0,0,0.02);
+}}
 
-/* Container principal */
-.planner-container {
-    background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-    padding: 30px;
-    border-radius: 20px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.1);
-    backdrop-filter: blur(10px);
-}
-
-/* Header do planner */
-.planner-header {
-    background: white;
-    border: none;
-    border-radius: 15px;
-    padding: 15px 30px;
+.planner-header {{
+    border: 2px solid #3B3C43;
+    border-radius: 8px;
+    padding: 10px 20px;
     display: inline-block;
-    margin-bottom: 30px;
-    box-shadow: 0 10px 30px rgba(0,0,0,0.08);
-    transform: translateY(0);
-    transition: all 0.3s ease;
-}
-
-.planner-header:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 15px 40px rgba(0,0,0,0.12);
-}
-
-.planner-title {
-    font-family: 'Playfair Display', Georgia, serif !important;
-    font-size: 2.8rem;
+    margin-bottom: 20px;
+}}
+.planner-title {{
+    font-family: 'Times New Roman', Times, serif !important;
+    font-size: 2.5rem;
     font-weight: 800;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: 3px;
+    color: #3B3C43;
+    letter-spacing: 2px;
     text-transform: uppercase;
     margin: 0;
-}
+}}
 
-/* Labels dos dias da semana */
-.dia-semana-label {
-    text-align: center;
-    font-weight: 700;
-    padding: 15px 5px;
-    font-size: 1.2rem;
-    background: white;
-    border-radius: 10px;
-    margin-bottom: 10px;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.05);
-    font-family: 'Inter', sans-serif !important;
-    letter-spacing: 1px;
-}
+.dia-semana-label {{
+    text-align: center; font-weight: 700; padding: 10px 5px; 
+    font-size: 1.1rem; border-bottom: 2px solid #EBEBEB;
+    font-family: 'Georgia', serif !important; font-style: italic;
+}}
 
-/* Cards dos dias */
-.day-card {
-    border: none;
-    background: white;
-    height: 200px;
-    overflow-y: auto;
-    padding: 15px;
-    box-sizing: border-box;
-    border-radius: 15px;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.06);
-    transition: all 0.3s ease;
-    position: relative;
-}
+.day-card {{
+    border: 1px solid #EBEBEB; background: #FFFFFF;
+    height: 180px; overflow-y: auto; padding: 8px;
+    box-sizing: border-box; position: relative;
+}}
+.day-card-header {{
+    display: flex; justify-content: flex-end;
+    border-bottom: 1px solid #F0F0F0; margin-bottom: 6px; padding-bottom: 2px;
+}}
+.day-num {{
+    font-weight: 700; font-size: 0.9rem; color: #555;
+}}
 
-.day-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 15px 35px rgba(0,0,0,0.12);
-}
-
-.day-card-header {
-    display: flex;
-    justify-content: flex-end;
-    margin-bottom: 10px;
-    padding-bottom: 8px;
-    border-bottom: 2px solid #f0f0f0;
-}
-
-.day-num {
-    font-weight: 800;
-    font-size: 1.1rem;
-    color: #333;
-    background: #f8f9fa;
-    padding: 5px 12px;
-    border-radius: 20px;
-}
-
-/* Itens de tarefa */
-.task-item {
-    display: flex;
-    align-items: flex-start;
-    font-size: 0.8rem;
-    margin-bottom: 8px;
-    padding: 6px;
-    border-radius: 8px;
-    background: #f8f9fa;
-    transition: all 0.2s ease;
-}
-
-.task-item:hover {
-    background: #e9ecef;
-    transform: translateX(3px);
-}
-
-.task-box {
-    border: 2px solid #dee2e6;
-    width: 12px;
-    height: 12px;
-    margin-right: 8px;
-    margin-top: 2px;
-    border-radius: 4px;
+.task-item {{
+    display: flex; align-items: flex-start;
+    font-size: 0.75rem; margin-bottom: 6px; color: #444;
+    line-height: 1.3;
+}}
+.task-box {{
+    border: 1px solid #CCC; width: 10px; height: 10px;
+    margin-right: 6px; margin-top: 3px; border-radius: 2px;
     flex-shrink: 0;
-    transition: all 0.2s ease;
-}
-
-.task-item:hover .task-box {
-    border-color: #667eea;
-}
-
-.task-text {
+}}
+.task-text {{
     word-break: break-word;
-    font-weight: 500;
-    line-height: 1.4;
-}
+}}
 
-/* Scrollbar personalizada */
-::-webkit-scrollbar {
-    width: 6px;
-}
-
-::-webkit-scrollbar-track {
-    background: #f1f3f5;
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border-radius: 10px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-}
-
-/* Botões de navegação */
-.stButton button {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 25px;
-    font-weight: 600;
-    font-size: 1rem;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-}
-
-.stButton button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
-    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
-}
+::-webkit-scrollbar {{ width: 4px; }}
+::-webkit-scrollbar-track {{ background: transparent; }}
+::-webkit-scrollbar-thumb {{ background: #d1d5db; border-radius: 4px; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -273,11 +162,9 @@ st.markdown('<div class="planner-container">', unsafe_allow_html=True)
 
 col_nav1, col_nav2, col_nav3 = st.columns([1, 4, 1])
 with col_nav1:
-    if st.button("◀ Mês Anterior"):
-        if mes == 1:
-            st.session_state.mes, st.session_state.ano = 12, ano - 1
-        else:
-            st.session_state.mes -= 1
+    if st.button("◀ Anterior"):
+        if mes == 1: st.session_state.mes, st.session_state.ano = 12, ano - 1
+        else: st.session_state.mes -= 1
         st.rerun()
 with col_nav2:
     st.markdown(f"""
@@ -288,11 +175,9 @@ with col_nav2:
     </div>
     """, unsafe_allow_html=True)
 with col_nav3:
-    if st.button("Próximo Mês ▶"):
-        if mes == 12:
-            st.session_state.mes, st.session_state.ano = 1, ano + 1
-        else:
-            st.session_state.mes += 1
+    if st.button("Próximo ▶"):
+        if mes == 12: st.session_state.mes, st.session_state.ano = 1, ano + 1
+        else: st.session_state.mes += 1
         st.rerun()
 
 cols = st.columns(7)
@@ -311,8 +196,8 @@ for semana in semanas:
             no_mes = dia.month == mes
             ativs = atividades_do_dia(dia)
             opacidade = "1" if no_mes else "0.4"
-            bg_color = "#F8F9FA" if not no_mes else "#FFFFFF"
-            borda_topo = f"border-top: 5px solid {CORES_SEMANA[i]};" if no_mes else "border-top: 5px solid #E9ECEF;"
+            bg_color = "#FAFAFA" if not no_mes else "#FFFFFF"
+            borda_topo = f"border-top: 4px solid {CORES_SEMANA[i]};" if no_mes else "border-top: 4px solid #EBEBEB;"
 
             html_tasks = ""
             for a in ativs[:MAX_ATIVIDADES_DIA]:
@@ -320,7 +205,7 @@ for semana in semanas:
                 html_tasks += f'<div class="task-item"><div class="task-box"></div><div class="task-text" style="color:{a["cor"]}; font-weight:600;">{texto}</div></div>'
             
             if len(ativs) > MAX_ATIVIDADES_DIA:
-                html_tasks += f'<div style="font-size:0.7rem; color:#6c757d; text-align:center; margin-top:8px; font-weight:600;">+{len(ativs)-MAX_ATIVIDADES_DIA} itens</div>'
+                html_tasks += f'<div style="font-size:0.65rem; color:#999; text-align:center; margin-top:4px;">+{len(ativs)-MAX_ATIVIDADES_DIA} itens</div>'
 
             card_html = f'<div class="day-card" style="opacity:{opacidade}; background:{bg_color}; {borda_topo}"><div class="day-card-header"><span class="day-num">{dia.day}</span></div>{html_tasks}</div>'
             
